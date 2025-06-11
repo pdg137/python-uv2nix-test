@@ -58,6 +58,8 @@ let
     sourcePreference = "wheel";
   };
 
+  pyprojectOverrides = import ./pyproject-overrides.nix pkgs;
+
   pythonSet =
     # Use base package set from pyproject.nix builders
     (pkgs.callPackage pyproject-nix.build.packages {
@@ -66,6 +68,7 @@ let
       .overrideScope (pkgs.lib.composeManyExtensions [
         pyproject-build-systems.default
         uvLockedOverlay
+        pyprojectOverrides
       ]);
 
   virtualenv = pythonSet.mkVirtualEnv "python-test" workspace.deps.all;
