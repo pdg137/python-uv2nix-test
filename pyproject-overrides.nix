@@ -7,7 +7,7 @@ prev: # previous python package set
 {
   # https://github.com/nix-community/poetry2nix/blob/1fb01e90771f762655be7e0e805516cd7fa4d58e/overrides/default.nix#L2899
   pyside6-essentials = prev.pyside6-essentials.overrideAttrs (old: pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
-    autoPatchelfIgnoreMissingDeps = [ "libmysqlclient.so.21" "libmimerapi.so" "libQt6EglFsKmsGbmSupport.so*" ];
+    autoPatchelfIgnoreMissingDeps = [ "libmysqlclient.so.21" "libmimerapi.so" "libQt6EglFsKmsGbmSupport.so*" "libQt6VirtualKeyboardQml.so.6" "libQt63DQuickScene3D.so.6" "libQt6VirtualKeyboardQml.so.6" "libspeechd.so.2" ];
     preFixup = ''
       addAutoPatchelfSearchPath ${final.shiboken6}/${final.python.sitePackages}/shiboken6
     '';
@@ -76,14 +76,44 @@ prev: # previous python package set
     ];
   });
 
-  # https://pypi.org/project/PyQt6/
-  pyqt6 = prev.pyqt6.overrideAttrs (old: {
-    buildInputs = old.buildInputs or [ ] ++ [
-      final.pyqt6-qt6
+  pyside6-addons = prev.pyside6-addons.overrideAttrs (_old: pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+    autoPatchelfIgnoreMissingDeps = [
+      "libmysqlclient.so.21"
+      "libmimerapi.so"
+      "libQt63DQuickLogic.so.6"
+      "libpcsclite.so.1"
+      "libspeechd.so.2"
     ];
+    preFixup = ''
+          addAutoPatchelfSearchPath ${final.shiboken6}/${final.python.sitePackages}/shiboken6
+          addAutoPatchelfSearchPath ${final.pyside6-essentials}/${final.python.sitePackages}/PySide6
+          addAutoPatchelfSearchPath $out/${final.python.sitePackages}/PySide6
+        '';
+    buildInputs = [
+      pkgs.nss
+      pkgs.xorg.libXtst
+      pkgs.alsa-lib
+      pkgs.xorg.libxshmfence
+      pkgs.xorg.libxkbfile
+    ];
+    postInstall = ''
+          rm -r $out/${final.python.sitePackages}/PySide6/__pycache__/
+        '';
   });
-
-  peewee = prev.peewee.overrideAttrs (old: {
-    buildInputs = old.buildInputs or [ ] ++ [ final.setuptools ];
+  pyside6 = prev.pyside6.overrideAttrs (_old: {
+    # The PySide6/__init__.py script tries to find the Qt libraries
+    # relative to its own path in the installed site-packages directory.
+    # This then fails to find the paths from pyside6-essentials and
+    # pyside6-addons because they are installed into different directories.
+    #
+    # To work around this issue we symlink all of the files resulting from
+    # those packages into the aggregated `pyside6` output directories.
+    #
+    # See https://github.com/nix-community/poetry2nix/issues/1791 for more details.
+    postFixup = ''
+          ${pkgs.xorg.lndir}/bin/lndir ${final.pyside6-essentials}/${final.python.sitePackages}/PySide6 $out/${final.python.sitePackages}/PySide6
+          ${pkgs.xorg.lndir}/bin/lndir ${final.pyside6-addons}/${final.python.sitePackages}/PySide6 $out/${final.python.sitePackages}/PySide6
+          rm -r $out/${final.python.sitePackages}/PySide6/__pycache__/
+        '';
   });
 }
